@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Tracker</title>
+
+    <!-- External Stylesheets -->
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- External Scripts -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="text-center my-4">
+        <h1>
+            <span class="money-symbol">&#x1F4B8;</span> CloudCash <span class="money-symbol">&#x1F4B8;</span>
+        </h1>
+        <h2>Current Balance: ${{ '{:.2f}'.format(balance) }}</h2>
+    </header>
+
+
+    <div class="container">
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs" id="financeTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if not active_tab or active_tab != 'history' %}active{% endif %}" id="income-expense-tab" data-bs-toggle="tab" data-bs-target="#income-expense" type="button" role="tab">
+                    Income & Expenses
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_tab == 'history' %}active{% endif %}" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab">
+                    Transaction History
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">
+                    Summary
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="chatbot-tab" data-bs-toggle="tab" data-bs-target="#chatbot" type="button" role="tab">
+                    Chatbot
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="financeTabsContent">
+            <!-- Financial Summary Tab -->
+            <div class="tab-pane fade" id="summary" role="tabpanel">
+                <section class="mt-3">
+                    <h3>Financial Summary</h3>
+                    <div class="mb-3">
+                        <select id="summary-period" class="form-control" style="max-width: 200px;">
+                            <option value="all">All Time</option>
+                            <option value="month">Last Month</option>
+                            <option value="2weeks">Last 2 Weeks</option>
+                            <option value="week">Last Week</option>
+                        </select>
+                    </div>
+                    <p><strong>Total Income:</strong> $<span id="total-income">0</span></p>
+                    <p><strong>Total Expense:</strong> $<span id="total-expense">0</span></p>
+                    <p><strong>Net Balance:</strong> $<span id="net-balance">0</span></p>
+
+                    <!-- Bar Graph Placeholder -->
+                    <canvas id="summaryChart" width="400" height="200"></canvas>
+                    <button id="download-summary" class="btn btn-success mt-3">Download Summary as Excel</button>
+                </section>
+                <section class="mt-3">
+                    <div id="summary-result" class="mt-3"></div>
+                </section>
+            </div>
+
+            <!-- Income & Expense Tab -->
+            <div class="tab-pane fade {% if not active_tab or active_tab != 'history' %}show active{% endif %}" id="income-expense" role="tabpanel">
+                <section class="mt-3">
+                    <h3>Add Income</h3>
+                    <form action="/add" method="post">
+                        <label for="income-date">Date:</label>
+                        <input type="date" id="income-date" name="date" required>
+
+                        <label for="income-amount">Amount:</label>
+                        <input type="number" id="income-amount" name="amount" step="0.01" required>
+
+                        <label for="income-category">Category:</label>
+                        <select id="income-category" name="category">
+                            <option value="salary">Salary</option>
+                            <option value="investments">Investments</option>
+                            <option value="gifts">Gifts</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <button type="submit">Add Transaction</button>
+                    </form>
+                    <p><strong>Instructions:</strong> Use the form to record your income details. Select the income category and provide the amount, date, and type of the income.</p>
+                </section>
+
+                <section class="mt-3">
+                    <h3>Add Expense</h3>
+                    <form action="/add" method="post">
+                        <label for="expense-date">Date:</label>
+                        <input type="date" id="expense-date" name="date" required>
+
+                        <label for="expense-amount">Amount:</label>
+                        <input type="number" id="expense-amount" name="amount" step="0.01" required>
+
+                        <label for="expense-category">Category:</label>
+                        <select id="expense-category" name="category">
+                            <option value="food">Food</option>
+                            <option value="shopping">Shopping</option>
+                            <option value="transport">Transport</option>
+                            <option value="housing">Housing</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <button type="submit">Add Transaction</button>
+                    </form>
+                    <p><strong>Instructions:</strong> Use this form to record your expenses. Select the expense category and provide the amount and date for your expense.</p>
+                </section>
+            </div>
+
+
+                    <!-- Transaction History Tab -->
+                    <div class="tab-pane fade {% if active_tab == 'history' %}show active{% endif %}" id="history" role="tabpanel">
+                        <section class="mt-3">
+                            <h3>Transaction History</h3>
+                            <p><strong>Instructions:</strong> Here you can view your complete transaction history.If needed you can delete and filter transactions.</p>
+
+                    <!-- Filtering Form -->
+                    <form method="get" action="/filter">
+                        <div class="row mb-3">
+                            <div class="col">
+                                <label for="start_date">From Date:</label>
+                                <input type="date" id="start_date" name="start_date" class="form-control" value="{{ request.args.get('start_date') }}">
+                            </div>
+                            <div class="col">
+                                <label for="end_date">To Date:</label>
+                                <input type="date" id="end_date" name="end_date" class="form-control" value="{{ request.args.get('end_date') }}">
+                            </div>
+                            <div class="col">
+                                <label for="category">Category:</label>
+                                <select id="category" name="category" class="form-control">
+                                    <option value="">All</option>
+                                    <option value="salary">Salary</option>
+                                    <option value="investments">Investments</option>
+                                    <option value="gifts">Gifts</option>
+                                    <option value="other_income">Other Income</option>
+                                    <option value="food">Food</option>
+                                    <option value="shopping">Shopping</option>
+                                    <option value="transport">Transport</option>
+                                    <option value="housing">Housing</option>
+                                    <option value="other_expense">Other Expense</option>
+                                </select>
+                            </div>
+                            <div class="col">
+                                <button type="submit" class="btn btn-primary mt-4">Filter</button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Transactions Table -->
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Transaction Number</th>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Amount</th>
+                                <th>Income or Expense</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for transaction in transactions %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>{{ transaction.date }}</td>
+                                <td>{{ transaction.category }}</td>
+                                <td>${{ transaction.amount }}</td>
+                                <td>{{ transaction.type }}</td>
+                                <td>
+                                    <form action="/delete" method="post" style="display:inline;">
+                                        <input type="hidden" name="transaction_id" value="{{ transaction.id }}">
+                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+        </div>
+    </div>
+    <div class="tab-content" id="financeTabsContent">
+        <!-- Chatbot Tab -->
+        <div class="tab-pane fade" id="chatbot" role="tabpanel">
+            <section class="mt-3 px-4">
+                <h3>Chatbot</h3>
+                <p>Ask questions like:</p>
+                <ul>
+                    <li>What am I spending the most money on?</li>
+                    <li>What is my biggest source of income?</li>
+                    <li>What is my highest expense in a single transaction?</li>
+                    <li>What category has the most transactions?</li>
+                </ul>
+                <form id="chatbot-form" method="post" action="/chatbot">
+                    <label for="prompt">Ask a question:</label>
+                    <input type="text" id="prompt" name="prompt" required>
+                    <button type="submit" class="btn btn-primary">Ask</button>
+                </form>
+                <div id="chatbot-response" class="mt-3"></div>
+            </section>
+        </div>
+    </div>  <!-- Close .tab-content -->
+
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            let summaryChart;  // Global chart variable
+
+            function refreshSummary() {
+                fetch('/get-summary')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("total-income").textContent = data.total_income;
+                        document.getElementById("total-expense").textContent = data.total_expense;
+                        document.getElementById("net-balance").textContent = data.net_balance;
+
+                        const ctx = document.getElementById('summaryChart').getContext('2d');
+
+                        // Destroy existing chart before creating a new one
+                        if (summaryChart) {
+                            summaryChart.destroy();
+                        }
+
+                        summaryChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Total Income', 'Total Expense', 'Net Balance'],
+                                datasets: [{
+                                    label: 'Amount ($)',
+                                    data: [data.total_income, data.total_expense, data.net_balance],
+                                    backgroundColor: ['#4caf50', '#f44336', '#2196f3'],
+                                    borderColor: ['#4caf50', '#f44336', '#2196f3'],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                },
+                                barThickness: 100
+                            }
+                        });
+                    })
+                    .catch(error => console.error("Error fetching summary data:", error));
+            }
+
+            // Refresh summary when Summary tab is clicked or period changes
+            document.getElementById("summary-tab").addEventListener("click", refreshSummary);
+            document.getElementById("summary-period").addEventListener("change", refreshSummary);
+
+            function refreshSummary() {
+                const period = document.getElementById("summary-period").value;
+                fetch('/get-summary?period=' + period)
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById("total-income").textContent = data.total_income;
+                        document.getElementById("total-expense").textContent = data.total_expense;
+                        document.getElementById("net-balance").textContent = data.net_balance;
+
+                        const ctx = document.getElementById('summaryChart').getContext('2d');
+
+                        // Destroy existing chart before creating a new one
+                        if (summaryChart) {
+                            summaryChart.destroy();
+                        }
+
+                        summaryChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Total Income', 'Total Expense', 'Net Balance'],
+                                datasets: [{
+                                    label: 'Amount ($)',
+                                    data: [data.total_income, data.total_expense, data.net_balance],
+                                    backgroundColor: ['#4caf50', '#f44336', '#2196f3'],
+                                    borderColor: ['#4caf50', '#f44336', '#2196f3'],
+                                    borderWidth: 1
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                scales: {
+                                    y: {
+                                        beginAtZero: true
+                                    }
+                                },
+                                barThickness: 40
+                            }
+                        });
+                    })
+                    .catch(error => console.error("Error fetching summary data:", error));
+            }
+
+            // Download summary as Excel
+            document.getElementById('download-summary').addEventListener('click', function () {
+                fetch('/download-summary')
+                    .then(response => response.blob())
+                    .then(blob => {
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = 'finance_summary.xlsx';
+                        link.click();
+                    })
+                    .catch(error => console.error("Error downloading summary:", error));
+            });
+
+            // Chatbot Submission with JSON Parsing Safeguard
+            document.getElementById("chatbot-form").addEventListener("submit", function(e) {
+                e.preventDefault();
+                const prompt = document.getElementById("prompt").value;
+
+                fetch("/chatbot", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({ "prompt": prompt })
+                })
+                .then(response => response.json().catch(() => ({ response: "Unexpected error occurred." })))
+                .then(data => {
+                    document.getElementById("chatbot-response").textContent = data.response;
+                })
+                .catch(error => {
+                    document.getElementById("chatbot-response").textContent = "Error processing your request.";
+                });
+            });
+        });
+    </script>
+
+
+</body>
+</html>
