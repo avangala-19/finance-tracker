@@ -1,4 +1,4 @@
-# money-tracker
+# CloudCash
 This finance tracker, named CloudCash, is a web application designed to help users manage their personal finances.
 
 It allows users to:
